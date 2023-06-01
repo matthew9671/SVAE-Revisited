@@ -1,6 +1,8 @@
 import jax
 import jax.numpy as np
+import jax.random as jr
 from jax.numpy.linalg import eigh, cholesky, svd, inv, solve
+from jax.scipy.linalg import solve_triangular
 from jax import scipy
 
 import matplotlib.pyplot as plt

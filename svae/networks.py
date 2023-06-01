@@ -391,8 +391,6 @@ class StochasticRNNCell(nn.Module):
         cov = lie_params_to_constrained(cov_flat, self.output_dim, self.eps)
         return h, (cov, mean)
 
-# @title Emission network (outputs distribution instead of parameters)
-
 # This is largely for convenience
 class GaussianEmission(GaussianRecognition):
     def __call__(self, inputs):

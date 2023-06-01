@@ -1,4 +1,25 @@
+import jax
+from jax import jit, vmap
+from jax.lax import scan
+from jax import random as jr
+from jax import numpy as np
+from jax.tree_util import tree_map
+
+import optax as opt
+from copy import deepcopy
+
+from functools import partial
+
+from tqdm import trange
+
 from time import time
+
+from svae.logging import summarize_pendulum_run, predict_multiple, save_params_to_wandb, log_to_wandb, validation_log_to_wandb
+from svae.posteriors import DKFPosterior, CDKFPosterior, LDSSVAEPosterior, PlaNetPosterior
+from svae.priors import LinearGaussianChainPrior, LieParameterizedLinearGaussianChainPrior
+from svae.networks import PlaNetRecognitionWrapper
+from svae.utils import truncate_singular_values
+from svae.svae import DeepLDS
 
 class Trainer:
     """
@@ -133,6 +154,7 @@ class Trainer:
             batch_id = itr % num_batches
             batch_start = batch_id * batch_size
 
+            # Uncomment this to time the execution
             # t = time()
             # Training step
             # ----------------------------------------

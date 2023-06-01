@@ -1,8 +1,9 @@
-import jax
-from jax import vmap, lax, jit, value_and_grad
+from jax import vmap
+from jax.tree_util import tree_map
 import jax.numpy as np
-import jax.scipy as scipy
 import jax.random as jr
+
+import numpy as onp
 
 class SVAE:
     def __init__(self,
@@ -123,7 +124,6 @@ class SVAE:
         results["objective"] = results["elbo"]
         return results
 
-# @title The DeepLDS object (implements custom kl function)
 class DeepLDS(SVAE):
     def kl_posterior_prior(self, posterior_params, prior_params, 
                            samples=None):

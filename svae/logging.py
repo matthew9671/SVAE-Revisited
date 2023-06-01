@@ -1,3 +1,27 @@
+import wandb
+import matplotlib.pyplot as plt
+
+from jax import vmap
+import jax.numpy as np
+import jax.random as jr
+
+import tensorflow_probability.substrates.jax.distributions as tfd
+MVN = tfd.MultivariateNormalFullCovariance
+
+from jax.numpy.linalg import eigh, svd
+from PIL import Image
+
+from pprint import pprint
+from copy import deepcopy
+
+import pickle as pkl
+
+from distributions import LinearGaussianChain
+
+import numpy as onp
+
+from svae.utils import lie_params_to_constrained
+
 def visualize_pendulum(trainer, aux):
     # This assumes single sequence has shape (100, 24, 24, 1)
     recon = aux["reconstruction"][0][0]
@@ -139,9 +163,8 @@ def log_to_wandb(trainer, loss_out, data_dict, grads):
 
     visualizations = {}
     if (itr % p["plot_interval"] == 0):
-        if p["dataset"] == "lds" and p.get("visualize_training"):
-            visualizations = visualize_lds(trainer, data_dict, aux)
-        elif p["dataset"] == "pendulum" and p.get("visualize_training"):
+        # We have deprecated visualization of the LDS
+        if p["dataset"] == "pendulum" and p.get("visualize_training"):
             visualizations = visualize_pendulum(trainer, aux)
 
         fig = plt.figure()
