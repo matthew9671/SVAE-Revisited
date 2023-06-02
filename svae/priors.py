@@ -11,6 +11,7 @@ MVN = tfd.MultivariateNormalFullCovariance
 
 from svae.utils import random_rotation, inv_softplus, lie_params_to_constrained
 from svae.distributions import LinearGaussianChain
+from svae.utils import dynamics_to_tridiag
 
 class SVAEPrior:
     def init(self, key):

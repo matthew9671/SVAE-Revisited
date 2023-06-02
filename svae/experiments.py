@@ -1,7 +1,28 @@
+import copy
+from pprint import pprint
 from copy import deepcopy
 
-from posteriors import DKFPosterior, CDKFPosterior, PlaNetPosterior, LDSSVAEPosterior
-from priors import LinearGaussianChainPrior, LieParameterizedLinearGaussianChainPrior
+# for logging
+import wandb
+# Jax
+import jax
+import jax.numpy as np
+import jax.random as jr
+key_0 = jr.PRNGKey(0) # Convenience
+# optax
+import optax as opt
+
+# Tensorflow probability
+import tensorflow_probability.substrates.jax.distributions as tfd
+MVN = tfd.MultivariateNormalFullCovariance
+
+from svae.posteriors import DKFPosterior, CDKFPosterior, PlaNetPosterior, LDSSVAEPosterior
+from svae.priors import LinearGaussianChainPrior, LieParameterizedLinearGaussianChainPrior
+from svae.networks import PlaNetRecognitionWrapper
+from svae.training import Trainer, experiment_scheduler, svae_pendulum_val_loss, svae_init, svae_loss, svae_update
+from svae.svae import DeepLDS
+from svae.datasets import sample_lds_dataset, load_nlb, load_pendulum
+from svae.logging import summarize_pendulum_run, save_params_to_wandb, log_to_wandb, validation_log_to_wandb, on_error
 
 def init_model(run_params, data_dict):
     p = deepcopy(run_params)
@@ -573,13 +594,7 @@ def expand_nlb_parameters(params):
 
 def run_lds(run_params, run_variations=None):
     jax.config.update("jax_debug_nans", True)
-
-    if (run_params["dimensionality"] == "64"
-    and run_params["dataset_size"] == "large"):
-        load_lds = load_lds_64d
-        print("Loading pre-sampled data")
-    else:
-        load_lds = sample_lds_dataset
+    load_lds = sample_lds_dataset
 
     results = experiment_scheduler(run_params, 
                      run_variations=run_variations,
