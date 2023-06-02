@@ -16,10 +16,9 @@ from copy import deepcopy
 
 import pickle as pkl
 
-from distributions import LinearGaussianChain
-
 import numpy as onp
 
+from svae.distributions import LinearGaussianChain
 from svae.utils import lie_params_to_constrained
 
 def visualize_pendulum(trainer, aux):
