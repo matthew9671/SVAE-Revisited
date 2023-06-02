@@ -7,9 +7,12 @@ from flax.core import frozen_dict as fd
 
 import tensorflow_probability.substrates.jax.distributions as tfd
 
-from utils import random_rotation
-from priors import LinearGaussianChainPrior
-from posteriors import LDSSVAEPosterior
+from svae.utils import random_rotation
+from svae.priors import LinearGaussianChainPrior
+from svae.posteriors import LDSSVAEPosterior
+
+# TODO: get rid of this and its dependencies
+data_dict = {}
 
 # Takes a linear Gaussian chain as its base
 class LDS(LinearGaussianChainPrior):

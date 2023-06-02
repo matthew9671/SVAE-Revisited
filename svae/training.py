@@ -23,6 +23,8 @@ from svae.networks import PlaNetRecognitionWrapper
 from svae.utils import truncate_singular_values
 from svae.svae import DeepLDS
 
+
+
 # @title Experiment scheduler
 LINE_SEP = "#" * 42
 

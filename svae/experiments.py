@@ -18,11 +18,22 @@ MVN = tfd.MultivariateNormalFullCovariance
 
 from svae.posteriors import DKFPosterior, CDKFPosterior, PlaNetPosterior, LDSSVAEPosterior
 from svae.priors import LinearGaussianChainPrior, LieParameterizedLinearGaussianChainPrior
-from svae.networks import PlaNetRecognitionWrapper
+from svae.networks import GaussianRecognition, GaussianBiRNN, TemporalConv, \
+    GaussianEmission, GaussianDCNNEmission, GaussianDCNNEmissionFixedCovariance, \
+    PlaNetRecognitionWrapper
 from svae.training import Trainer, experiment_scheduler, svae_pendulum_val_loss, svae_init, svae_loss, svae_update
 from svae.svae import DeepLDS
 from svae.datasets import sample_lds_dataset, load_nlb, load_pendulum
 from svae.logging import summarize_pendulum_run, save_params_to_wandb, log_to_wandb, validation_log_to_wandb, on_error
+
+networks = {
+    "GaussianRecognition": GaussianRecognition,
+    "GaussianBiRNN": GaussianBiRNN,
+    "TemporalConv": TemporalConv,
+    "GaussianEmission": GaussianEmission,
+    "GaussianDCNNEmission": GaussianDCNNEmission,
+    "GaussianDCNNEmissionFixedCovariance": GaussianDCNNEmissionFixedCovariance,
+}
 
 def init_model(run_params, data_dict):
     p = deepcopy(run_params)
@@ -35,8 +46,8 @@ def init_model(run_params, data_dict):
     seed_model, seed_elbo, seed_ems, seed_rec = jr.split(seed, 4)
 
     run_type = p["run_type"]
-    recnet_class = globals()[p["recnet_class"]]
-    decnet_class = globals()[p["decnet_class"]]
+    recnet_class = networks[p["recnet_class"]]
+    decnet_class = networks[p["decnet_class"]]
 
     if p["inference_method"] == "dkf":
         posterior = DKFPosterior(latent_dims, num_timesteps)
