@@ -603,19 +603,27 @@ def expand_nlb_parameters(params):
     extended_params.update(params)
     return extended_params
 
-def run_lds(run_params, run_variations=None):
-    jax.config.update("jax_debug_nans", True)
-    load_lds = sample_lds_dataset
+# def run_lds(run_params, run_variations=None):
+#     jax.config.update("jax_debug_nans", True)
+#     load_lds = sample_lds_dataset
 
-    results = experiment_scheduler(run_params, 
-                     run_variations=run_variations,
-                     dataset_getter=load_lds, 
-                     model_getter=init_model, 
-                     train_func=start_trainer,
-                     params_expander=expand_lds_parameters,
-                     on_error=on_error)
-    wandb.finish()
-    return results
+#     results = experiment_scheduler(run_params, 
+#                      run_variations=run_variations,
+#                      dataset_getter=load_lds, 
+#                      model_getter=init_model, 
+#                      train_func=start_trainer,
+#                      params_expander=expand_lds_parameters,
+#                      on_error=on_error)
+#     wandb.finish()
+#     return results
+
+def run_lds(run_params):
+
+    params = expand_lds_parameters(run_params)
+    dataset = sample_lds_dataset(params)
+    model = init_model(params, dataset)
+
+    return start_trainer(model, dataset, params)
 
 def run_pendulum(run_params, run_variations=None):
     jax.config.update("jax_debug_nans", True)
@@ -629,14 +637,14 @@ def run_pendulum(run_params, run_variations=None):
     wandb.finish()
     return results
 
-def run_nlb(run_params, run_variations=None):
-    jax.config.update("jax_debug_nans", True)
-    results = experiment_scheduler(run_params, 
-                     run_variations=run_variations,
-                     dataset_getter=load_nlb, 
-                     model_getter=init_model, 
-                     train_func=start_trainer,
-                     params_expander=expand_nlb_parameters,
-                     on_error=on_error)
-    wandb.finish()
-    return results
+# def run_nlb(run_params, run_variations=None):
+#     jax.config.update("jax_debug_nans", True)
+#     results = experiment_scheduler(run_params, 
+#                      run_variations=run_variations,
+#                      dataset_getter=load_nlb, 
+#                      model_getter=init_model, 
+#                      train_func=start_trainer,
+#                      params_expander=expand_nlb_parameters,
+#                      on_error=on_error)
+#     wandb.finish()
+#     return results
