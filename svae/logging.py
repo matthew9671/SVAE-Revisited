@@ -1,4 +1,8 @@
-import wandb
+try:
+    import wandb
+except ImportError:
+    print("WandB is not available, logging will be disabled.")
+    
 import matplotlib.pyplot as plt
 
 from jax import vmap

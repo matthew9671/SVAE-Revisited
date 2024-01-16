@@ -2,8 +2,6 @@ import copy
 from pprint import pprint
 from copy import deepcopy
 
-# for logging
-import wandb
 # Jax
 import jax
 import jax.numpy as np
@@ -21,7 +19,7 @@ from svae.priors import LinearGaussianChainPrior, LieParameterizedLinearGaussian
 from svae.networks import GaussianRecognition, GaussianBiRNN, TemporalConv, \
     GaussianEmission, GaussianDCNNEmission, GaussianDCNNEmissionFixedCovariance, \
     PlaNetRecognitionWrapper
-from svae.training import Trainer, experiment_scheduler, svae_pendulum_val_loss, svae_init, svae_loss, svae_update
+from svae.training import Trainer, svae_pendulum_val_loss, svae_init, svae_loss, svae_update
 from svae.svae import DeepLDS
 from svae.datasets import sample_lds_dataset, load_nlb, load_pendulum
 from svae.logging import summarize_pendulum_run, save_params_to_wandb, log_to_wandb, validation_log_to_wandb, on_error
@@ -35,6 +33,7 @@ networks = {
     "GaussianDCNNEmissionFixedCovariance": GaussianDCNNEmissionFixedCovariance,
 }
 
+# TODO: rename this since it also initializes trainer
 def init_model(run_params, data_dict):
     p = deepcopy(run_params)
     d = p["dataset_params"]
@@ -508,14 +507,10 @@ def run_lds(run_params):
 
     return start_trainer(model, dataset, params)
 
-def run_pendulum(run_params, run_variations=None):
-    jax.config.update("jax_debug_nans", True)
-    results = experiment_scheduler(run_params, 
-                     run_variations=run_variations,
-                     dataset_getter=load_pendulum, 
-                     model_getter=init_model, 
-                     train_func=start_trainer,
-                     params_expander=expand_pendulum_parameters,
-                     on_error=on_error)
-    wandb.finish()
-    return results
+def run_pendulum(run_params):
+
+    params = expand_pendulum_parameters(run_params)
+    dataset = load_pendulum(params)
+    model = init_model(params, dataset)
+
+    return start_trainer(model, dataset, params)

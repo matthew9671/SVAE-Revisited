@@ -142,7 +142,7 @@ def load_pendulum(run_params, log=False):
     noise_scale = d["emission_cov"] ** 0.5
     key_train, key_val, key_pred = jr.split(d["seed"], 3)
 
-    data = np.load("pendulum/pend_regression.npz")
+    data = np.load("data/pendulum/pendulum_train.npz")
 
     def _process_data(data, key):
         processed = data[:, ::2] / 255.0
@@ -154,7 +154,7 @@ def load_pendulum(run_params, log=False):
     train_data = _process_data(data["train_obs"][:train_trials], key_train)
     train_states = data["train_targets"][:train_trials, ::2]
     # val_data = _process_data(data["test_obs"][:val_trials], key_val)
-    data = np.load("pendulum/pend_regression_longer.npz")
+    data = np.load("pendulum/pendulum_val.npz")
     val_data = _process_data(data["test_obs"][:val_trials], key_pred)
     val_states = data["test_targets"][:val_trials, ::2]
 
@@ -165,31 +165,4 @@ def load_pendulum(run_params, log=False):
         "val_data": val_data,
         "train_states": train_states,
         "val_states": val_states,
-    }
-
-def load_nlb(run_params, log=False):
-    d = run_params["dataset_params"]
-    train_trials = d["train_trials"]
-    val_trials = d["val_trials"]
-
-    train_data = np.load("nlb-for-yz/nlb-dsmc_maze-phase_trn-split_trn.p", allow_pickle=True)
-    val_data = np.load("nlb-for-yz/nlb-dsmc_maze-phase_trn-split_val.p", allow_pickle=True)
-
-    x_train = np.asarray(train_data.tensors[0], dtype=np.float32)
-    y_train = np.asarray(train_data.tensors[1], dtype=np.float32)
-    x_val = np.asarray(val_data.tensors[0], dtype=np.float32)
-    y_val = np.asarray(val_data.tensors[1], dtype=np.float32)
-
-    print("Full dataset:", x_train.shape, x_val.shape)
-
-    x_train, y_train = x_train[:train_trials], y_train[:train_trials]
-    x_val, y_val = x_val[:val_trials], y_val[:val_trials]
-
-    print("Subset:", x_train.shape, x_val.shape)
-
-    return {
-        "train_data": x_train,
-        "train_targets": y_train,
-        "val_data": x_val,
-        "val_targets": y_val,
     }

@@ -13,7 +13,7 @@ from functools import partial
 from tqdm import trange
 
 from time import time
-import wandb, traceback
+import traceback
 from pprint import pprint
 
 from svae.logging import summarize_pendulum_run, predict_multiple, save_params_to_wandb, log_to_wandb, validation_log_to_wandb
@@ -22,8 +22,6 @@ from svae.priors import LinearGaussianChainPrior, LieParameterizedLinearGaussian
 from svae.networks import PlaNetRecognitionWrapper
 from svae.utils import truncate_singular_values
 from svae.svae import DeepLDS
-
-
 
 # @title Experiment scheduler
 # LINE_SEP = "#" * 42
@@ -226,7 +224,7 @@ class Trainer:
         return params, opts, (loss, aux), grads
 
     def val_step(self, key, params, data, target):
-        return self.val_loss(key, self.model, data, target, params)
+        return self.val_loss(key, self.model, data, target, params, **self.train_params)
 
     def val_epoch(self, key, params, data, target):
 
