@@ -154,7 +154,7 @@ def load_pendulum(run_params, log=False):
     train_data = _process_data(data["train_obs"][:train_trials], key_train)
     train_states = data["train_targets"][:train_trials, ::2]
     # val_data = _process_data(data["test_obs"][:val_trials], key_val)
-    data = np.load("pendulum/pendulum_val.npz")
+    data = np.load("data/pendulum/pendulum_val.npz")
     val_data = _process_data(data["test_obs"][:val_trials], key_pred)
     val_states = data["test_targets"][:val_trials, ::2]
 

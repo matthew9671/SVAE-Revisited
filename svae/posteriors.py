@@ -6,6 +6,7 @@ import copy
 from svae.priors import SVAEPrior, LinearGaussianChainPrior
 from svae.distributions import ParallelLinearGaussianSSM, LinearGaussianSSM, LinearGaussianChain, DeepAutoregressiveDynamics
 from svae.utils import random_rotation
+from svae.networks import StochasticRNNCell
 
 class LDSSVAEPosterior(SVAEPrior):
     def __init__(self, latent_dims, seq_len, use_parallel=False):

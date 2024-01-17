@@ -2,12 +2,25 @@ import jax
 import jax.numpy as np
 import jax.random as jr
 from jax.numpy.linalg import eigh, cholesky, svd, inv, solve
-from jax.scipy.linalg import solve_triangular
+from jax.scipy.linalg import solve_triangular, cho_factor, cho_solve
 from jax import scipy
 
 import matplotlib.pyplot as plt
 
 from flax.linen import softplus, sigmoid
+
+def psd_solve(A, b, diagonal_boost=1e-9):
+    """A wrapper for coordinating the linalg solvers used in the library for psd matrices."""
+    """Taken from the dynamax library."""
+    A = symmetrize(A) + diagonal_boost * np.eye(A.shape[-1])
+    L, lower = cho_factor(A, lower=True)
+    x = cho_solve((L, lower), b)
+    return x
+
+def symmetrize(A):
+    """Symmetrize one or more matrices."""
+    """Taken from the dynamax library."""
+    return 0.5 * (A + np.swapaxes(A, -1, -2))
 
 def plot_img_grid(recon):
     plt.figure(figsize=(8,8))
@@ -16,7 +29,6 @@ def plot_img_grid(recon):
     imgrid = stacked.swapaxes(0, 1).reshape(24 * 10, 24 * 10)
     plt.imshow(imgrid, vmin=0, vmax=1)
 
-# @title Math helpers
 def softplus(x):
     return np.log1p(np.exp(-np.abs(x))) + np.maximum(x, 0)
 
@@ -37,8 +49,6 @@ def vectorize_pytree(*args):
 # to an (n, n) matrix
 def lie_params_to_constrained(out_flat, dim, eps=1e-4):
     D, A = out_flat[:dim], out_flat[dim:]
-    # ATTENTION: we changed this!
-    # D = np.maximum(softplus(D), eps)
     D = softplus(D) + eps
     # Build a skew-symmetric matrix
     S = np.zeros((dim, dim))

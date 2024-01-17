@@ -8,14 +8,14 @@ import tensorflow_probability.substrates.jax.distributions as tfd
 from tensorflow_probability.python.internal import reparameterization
 MVN = tfd.MultivariateNormalFullCovariance
 
-from dynamax.linear_gaussian_ssm.inference import make_lgssm_params, lgssm_smoother
-from dynamax.utils.utils import psd_solve
 from jax.numpy.linalg import solve
 
 from functools import partial
 
 from svae.inference import lgssm_log_normalizer, parallel_lgssm_smoother, _make_associative_sampling_elements
-from svae.utils import dynamics_to_tridiag
+from svae.utils import dynamics_to_tridiag, psd_solve
+
+from dynamax.linear_gaussian_ssm.inference import make_lgssm_params, lgssm_smoother
 
 class LinearGaussianChain:
     def __init__(self, dynamics_matrix, dynamics_bias, noise_covariance,
@@ -423,10 +423,44 @@ class LinearGaussianSSM(tfd.Distribution):
         return entropy - self.log_prob(Ex)
 
 
-class ParallelLinearGaussianSSM(LinearGaussianSSM):
-    def __init__(self, *args, **kwargs) -> None:
-        kwargs["name"] = "ParallelLinearGaussianSSM"
-        super().__init__(*args, **kwargs)
+class ParallelLinearGaussianSSM:
+    def __init__(self,
+                 initial_mean,
+                 initial_covariance,
+                 dynamics_matrix,
+                 dynamics_bias,
+                 dynamics_noise_covariance,
+                 emissions_means,
+                 emissions_covariances,
+                 log_normalizer,
+                 filtered_means,
+                 filtered_covariances,
+                 smoothed_means,
+                 smoothed_covariances,
+                 smoothed_cross,
+                 name="ParallelLinearGaussianSSM",
+                 ) -> None:
+        # kwargs["name"] = "ParallelLinearGaussianSSM"
+
+        # Dynamics
+        self._initial_mean = initial_mean
+        self._initial_covariance = initial_covariance
+        self._dynamics_matrix = dynamics_matrix
+        self._dynamics_bias = dynamics_bias
+        self._dynamics_noise_covariance = dynamics_noise_covariance
+        # Emissions
+        self._emissions_means = emissions_means
+        self._emissions_covariances = emissions_covariances
+        # Filtered
+        self._log_normalizer = log_normalizer
+        self._filtered_means = filtered_means
+        self._filtered_covariances = filtered_covariances
+        # Smoothed
+        self._smoothed_means = smoothed_means
+        self._smoothed_covariances = smoothed_covariances
+        self._smoothed_cross = smoothed_cross
+        # Vectorize the appropriate functions
+        self.log_prob = np.vectorize(self._log_prob_single, signature="(t,d)->()")
 
     @classmethod
     def infer_from_dynamics_and_potential(cls, dynamics_params, emissions_potentials):
@@ -471,6 +505,155 @@ class ParallelLinearGaussianSSM(LinearGaussianSSM):
                    smoothed["smoothed_covariances"],
                    smoothed_cross)
 
+    # TODO: currently this function does not depend on the dynamics bias
+    def _log_prob_single(self, data):
+        A = self._dynamics_matrix  # params["A"]
+        Q = self._dynamics_noise_covariance  # params["Q"]
+        Q1 = self._initial_covariance  # params["Q1"]
+        m1 = self._initial_mean  # params["m1"]
+
+        num_batch_dims = len(data.shape) - 2
+
+        ll = np.sum(
+            MVN(loc=np.einsum("ij,...tj->...ti", A, data[..., :-1, :]),
+                covariance_matrix=Q).log_prob(data[..., 1:, :])
+        )
+        ll += MVN(loc=m1, covariance_matrix=Q1).log_prob(data[..., 0, :])
+
+        # Add the observation potentials
+        ll += np.sum(MVN(loc=self._emissions_means,
+                         covariance_matrix=self._emissions_covariances).log_prob(data), axis=-1)
+        # Add the log normalizer
+        ll -= self._log_normalizer
+
+        return ll
+
+    def _sample_n(self, n, seed=None):
+
+        F = self._dynamics_matrix
+        b = self._dynamics_bias
+        Q = self._dynamics_noise_covariance
+
+        def sample_single(
+                key,
+                filtered_means,
+                filtered_covariances
+        ):
+
+            initial_elements = _make_associative_sampling_elements(
+                {"A": F, "b": b, "Q": Q}, key, filtered_means, filtered_covariances)
+
+            @vmap
+            def sampling_operator(elem1, elem2):
+                E1, h1 = elem1
+                E2, h2 = elem2
+
+                E = E2 @ E1
+                h = E2 @ h1 + h2
+                return E, h
+
+            _, sample = \
+                lax.associative_scan(sampling_operator, initial_elements, reverse=True)
+
+            return sample
+
+        # TODO: Handle arbitrary batch shapes
+        if self._filtered_covariances.ndim == 4:
+            # batch mode
+            samples = vmap(vmap(sample_single, in_axes=(None, 0, 0)), in_axes=(0, None, None)) \
+                (jr.split(seed, n), self._filtered_means, self._filtered_covariances)
+            # Transpose to be (num_samples, num_batches, num_timesteps, dim)
+            # samples = np.transpose(samples, (1, 0, 2, 3))
+        else:
+            # non-batch mode
+            samples = vmap(sample_single, in_axes=(0, None, None)) \
+                (jr.split(seed, n), self._filtered_means, self._filtered_covariances)
+        return samples
+
+    def sample(self, sample_shape, seed):
+        if (len(sample_shape) == 0):
+            return self._sample_n(1, seed=seed)[0]
+        else:
+            # Only supports 1D sample shapes
+            assert (len(sample_shape) == 1)
+            n = sample_shape[0]
+            return self._sample_n(n, seed=seed)
+
+    def _entropy(self):
+        """
+        Compute the entropy
+
+            H[X] = -E[\log p(x)]
+                 = -E[-1/2 x^T J x + x^T h - log Z(J, h)]
+                 = 1/2 <J, E[x x^T]> - <h, E[x]> + log Z(J, h)
+        """
+        Ex = self.expected_states
+        ExxT = self.expected_states_squared
+        ExnxT = self.expected_states_next_states
+        p = dynamics_to_tridiag(
+            {
+                "m1": self._initial_mean,
+                "Q1": self._initial_covariance,
+                "A": self._dynamics_matrix,
+                "b": self._dynamics_bias,
+                "Q": self._dynamics_noise_covariance,
+            }, Ex.shape[0], Ex.shape[1]
+        )
+        J_diag = p["J"] + solve(self._emissions_covariances, np.eye(Ex.shape[-1])[None])
+        J_lower_diag = p["L"]
+
+        Sigmatt = ExxT - np.einsum("ti,tj->tij", Ex, Ex)
+        Sigmatnt = ExnxT - np.einsum("ti,tj->tji", Ex[:-1], Ex[1:])
+
+        entropy = 0.5 * np.sum(J_diag * Sigmatt)
+        entropy += np.sum(J_lower_diag * Sigmatnt)
+        return entropy - self.log_prob(Ex)
+
+    def entropy(self):
+        return self._entropy()
+    
+    # Properties to get private class variables
+    @property
+    def log_normalizer(self):
+        return self._log_normalizer
+
+    @property
+    def filtered_means(self):
+        return self._filtered_means
+
+    @property
+    def filtered_covariances(self):
+        return self._filtered_covariances
+
+    @property
+    def smoothed_means(self):
+        return self._smoothed_means
+
+    @property
+    def smoothed_covariances(self):
+        return self._smoothed_covariances
+
+    @property
+    def expected_states(self):
+        return self._smoothed_means
+
+    @property
+    def expected_states_squared(self):
+        Ex = self._smoothed_means
+        return self._smoothed_covariances + np.einsum("...i,...j->...ij", Ex, Ex)
+
+    @property
+    def expected_states_next_states(self):
+        return self._smoothed_cross
+
+    @property
+    def mean(self):
+        return self.smoothed_means
+
+    @property
+    def covariance(self):
+        return self.smoothed_covariances
+
 class DeepAutoregressiveDynamics:
 
     def __init__(self, network, params):
@@ -505,7 +688,7 @@ class DeepAutoregressiveDynamics:
         
     def compute_mean_and_cov(self):
         num_samples = 25
-        samples = self.sample((num_samples,), key_0)
+        samples = self.sample((num_samples,), jr.PRNGKey(0))
         Ex = np.mean(samples, axis=0)
         self._mean = Ex
         ExxT = np.einsum("s...ti,s...tj->s...tij", samples, samples).mean(axis=0)
@@ -526,7 +709,7 @@ class DeepAutoregressiveDynamics:
                 return carry, log_prob
             # Assuming these are zero arrays already
             init = (params["latent_dummy"], params["output_dummy"])
-            _, log_probs = scan(_log_prob_step, init, np.arange(x_.shape[0]))
+            _, log_probs = lax.scan(_log_prob_step, init, np.arange(x_.shape[0]))
             return np.sum(log_probs, axis=0)
         return vmap(log_prob_single)(xs)
 
@@ -545,7 +728,7 @@ class DeepAutoregressiveDynamics:
                 return carry, output
 
             init = (key, params["latent_dummy"], params["output_dummy"])
-            _, sample = scan(_sample_step, init, inputs)
+            _, sample = lax.scan(_sample_step, init, inputs)
             return sample
 
         if (len(self.inputs.shape) == 2):

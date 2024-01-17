@@ -21,7 +21,7 @@ from svae.networks import GaussianRecognition, GaussianBiRNN, TemporalConv, \
     PlaNetRecognitionWrapper
 from svae.training import Trainer, svae_pendulum_val_loss, svae_init, svae_loss, svae_update
 from svae.svae import DeepLDS
-from svae.datasets import sample_lds_dataset, load_nlb, load_pendulum
+from svae.datasets import sample_lds_dataset, load_pendulum
 from svae.logging import summarize_pendulum_run, save_params_to_wandb, log_to_wandb, validation_log_to_wandb, on_error
 
 networks = {

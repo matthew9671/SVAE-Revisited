@@ -5,7 +5,7 @@ import jax.random as jr
 import tensorflow_probability.substrates.jax.distributions as tfd
 MVN = tfd.MultivariateNormalFullCovariance
 
-from dynamax.utils.utils import psd_solve
+from svae.utils import psd_solve
 
 def _make_associative_sampling_elements(params, key, filtered_means, filtered_covariances):
     """Preprocess filtering output to construct input for smoothing assocative scan."""
